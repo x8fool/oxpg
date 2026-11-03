@@ -85,8 +85,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          package_dir="$RUNNER_TEMP/oxpg-release/oxmysql"
-          archive="$GITHUB_WORKSPACE/oxmysql.zip"
+          package_dir="$RUNNER_TEMP/oxpg-release/oxpg"
+          archive="$GITHUB_WORKSPACE/oxpg.zip"
 
           rm -rf "$RUNNER_TEMP/oxpg-release" "$archive"
           mkdir -p "$package_dir/lib" "$package_dir/web"
@@ -100,7 +100,7 @@ jobs:
           command -v unzip >/dev/null
 
           # Run zip from inside the resource folder so every entry is rooted at
-          # fxmanifest.lua, not inside an extra oxmysql/ parent directory.
+          # fxmanifest.lua, not inside an extra oxpg/ parent directory.
           (
             cd "$package_dir"
             zip -q -r -X "$archive" \
@@ -108,14 +108,23 @@ jobs:
           )
 
           test -s "$archive"
-          (cd "$GITHUB_WORKSPACE" && sha256sum oxmysql.zip > oxmysql.zip.sha256)
+          (cd "$GITHUB_WORKSPACE" && sha256sum oxpg.zip > oxpg.zip.sha256)
 
       - name: Verify release archive layout
         shell: bash
         run: |
           set -euo pipefail
+          if ! grep -Fxq "name 'oxpg'" fxmanifest.lua; then
+            echo "::error::Generated manifest must identify the resource as oxpg."
+            exit 1
+          fi
 
-          entries="$(unzip -Z1 oxmysql.zip)"
+          if ! grep -Fxq "provide 'oxmysql'" fxmanifest.lua; then
+            echo "::error::Generated manifest must provide the legacy oxmysql resource name."
+            exit 1
+          fi
+
+          entries="$(unzip -Z1 oxpg.zip)"
 
           for required in \
             fxmanifest.lua \
@@ -132,8 +141,8 @@ jobs:
             fi
           done
 
-          if grep -Eq '^(\./)?oxmysql/' <<< "$entries"; then
-            echo "::error::Release archive contains an unwanted oxmysql/ parent directory."
+          if grep -Eq '^(\./)?oxpg/' <<< "$entries"; then
+            echo "::error::Release archive contains an unwanted oxpg/ parent directory."
             exit 1
           fi
 
@@ -151,8 +160,8 @@ jobs:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           name: oxpg ${{ inputs.release_tag || github.ref_name }}
           files: |
-            oxmysql.zip
-            oxmysql.zip.sha256
+            oxpg.zip
+            oxpg.zip.sha256
           fail_on_unmatched_files: true
           overwrite_files: true
           generate_release_notes: true

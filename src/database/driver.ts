@@ -75,7 +75,7 @@ export function countPlaceholders(sql: string) {
         else if (char === backtick) { quote = null; index++; }
         else if (char === '\\' && next) index += 2;
         else index++;
-      } else if (char === '\\' && next && quote === "'") index += 2;
+      } else if (char === '\\' && next && (quote === "'" || quote === '"')) index += 2;
       else if (char === quote && next === quote) index += 2;
       else if (char === quote) { quote = null; index++; }
       else index++;
@@ -179,6 +179,37 @@ export function translateSql(input: string, values: unknown[] = []) {
         continue;
       }
 
+      if (quote === '"') {
+        // MySQL treats double-quoted values as string literals unless ANSI_QUOTES is enabled.
+        // Emit PostgreSQL single-quoted literals and escape embedded apostrophes.
+        if (char === '\\' && next) {
+          const escapes: Record<string, string> = {
+            '0': '\\0',
+            b: '\\b',
+            n: '\\n',
+            r: '\\r',
+            t: '\\t',
+            Z: '\\Z',
+          };
+          output += next === "'" ? "''" : (escapes[next] ?? next);
+          index += 2;
+        } else if (char === '"' && next === '"') {
+          output += '"';
+          index += 2;
+        } else if (char === '"') {
+          output += "'";
+          quote = null;
+          index++;
+        } else if (char === "'") {
+          output += "''";
+          index++;
+        } else {
+          output += char;
+          index++;
+        }
+        continue;
+      }
+
       output += char;
       index++;
       if (char === '\\' && next && quote === "'") {
@@ -217,9 +248,16 @@ export function translateSql(input: string, values: unknown[] = []) {
       }
     }
 
-    if (char === "'" || char === '"') {
+    if (char === "'") {
       quote = char;
       output += char;
+      index++;
+      continue;
+    }
+
+    if (char === '"') {
+      quote = char;
+      output += "'";
       index++;
       continue;
     }
