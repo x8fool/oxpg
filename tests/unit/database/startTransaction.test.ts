@@ -93,4 +93,20 @@ describe('startTransaction', () => {
     expect(conn.ops()).not.toContain('commit');
   });
 
+
+  test('rejects a transaction when its timeout callback fires before completion', async () => {
+    spyOn(console, 'error').mockImplementation(() => {});
+    const timeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler) => {
+      if (typeof handler === 'function') handler();
+      return 1 as any;
+    }) as any);
+
+    const result = await startTransaction('res', async () => true);
+
+    expect(result).toBe(false);
+    expect(conn.ops()).toContain('rollback');
+    expect(conn.ops()).not.toContain('commit');
+    timeoutSpy.mockRestore();
+  });
+
 });
