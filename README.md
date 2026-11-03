@@ -10,19 +10,21 @@ A PostgreSQL-backed FiveM database resource based on the oxmysql API.
 
 oxpg uses PostgreSQL through node-postgres while retaining the oxmysql-compatible Lua exports and MySQL wrapper. It is intended for FiveM servers migrating to PostgreSQL providers such as Neon.
 
-Keep the extracted resource directory named **oxmysql** when replacing an existing oxmysql installation. Existing resources commonly call exports.oxmysql and depend on that resource name.
+Install the resource in a folder named **oxpg** and start it with `ensure oxpg`.
+
+oxpg provides the legacy FiveM resource name `oxmysql` for compatibility. Existing resources can keep their `dependency 'oxmysql'`, `exports.oxmysql` calls, and `@oxmysql/lib/MySQL.lua` imports. New resources may use `exports.oxpg`. Do not run oxpg and the original oxmysql resource at the same time.
 
 ## Installation
 
-1. Build or download the resource and place it in your FiveM resources directory as oxmysql.
+1. Build or download the resource and extract it into your FiveM resources directory as `oxpg`.
 2. Configure a PostgreSQL URL in server.cfg:
 
    ~~~cfg
    set mysql_connection_string "postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
-   ensure oxmysql
+   ensure oxpg
    ~~~
 
-3. Start oxmysql before resources that use its exports.
+3. Ensure oxpg starts before resources that use its database exports.
 
 The resource also reads DATABASE_URL and DB_CONNECTION when the FiveM convar is not set. Do not commit database URLs, passwords, or .env files.
 
