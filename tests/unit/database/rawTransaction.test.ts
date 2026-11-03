@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, spyOn, afterEach } from 'bun:test';
 import { resetNatives, setConvar } from '../../setup';
 import { resetDb, setConnectionFactory, createFakeConnection, type FakeConnection } from '../../helpers/db';
 import * as config from 'config';
+import { resetProfilerState } from 'profiler';
 
 const { createConnectionPool } = await import('database/pool');
 await createConnectionPool();
@@ -11,6 +12,7 @@ let conn: FakeConnection;
 
 beforeEach(() => {
   resetNatives();
+  resetProfilerState();
   setConvar('mysql_debug', 'false');
   config.setDebug();
   resetDb();
