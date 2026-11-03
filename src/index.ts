@@ -138,6 +138,11 @@ for (const key in MySQL) {
 
   try {
     exports(key, exp);
+
+    // Preserve exports.oxmysql for resources that still depend on the legacy name.
+    provide('oxmysql', key, exp);
+    provide('oxmysql', `${key}_async`, async_exp);
+    provide('oxmysql', `${key}Sync`, async_exp);
     // async_retval
     exports(`${key}_async`, async_exp);
     // deprecated aliases for async_retval
