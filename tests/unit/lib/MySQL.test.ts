@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import '../../setup';
 
 // Fake server-side export surface: records the last dispatched call and
