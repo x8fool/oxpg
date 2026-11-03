@@ -128,4 +128,20 @@ describe('ready', () => {
   test('invokes the callback once the resource is started', async () => {
     await new Promise<void>((resolve) => oxmysql.ready(() => resolve()));
   });
+
+  test('waits and polls until the resource reaches the started state', async () => {
+    let polls = 0;
+    (globalThis as any).GetResourceState = () => (++polls === 1 ? 'starting' : 'started');
+    const timerSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler) => {
+      queueMicrotask(() => {
+        if (typeof handler === 'function') handler();
+      });
+      return 1 as any;
+    }) as any);
+
+    await new Promise<void>((resolve) => oxmysql.ready(() => resolve()));
+
+    expect(polls).toBe(2);
+    timerSpy.mockRestore();
+  });
 });
