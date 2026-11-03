@@ -20,6 +20,20 @@ beforeEach(() => {
   setConnectionFactory(() => conn);
 });
 
+
+function enableProfilerOnConnection(connection: FakeConnection) {
+  const originalQuery = connection.query.bind(connection);
+  connection.query = async (sql: string, values: any[] = []) => {
+    if (/^SET profiling/i.test(sql.trim())) {
+      return { rows: [], rowCount: 0, command: 'SET', fields: [] };
+    }
+    if (sql.includes('INFORMATION_SCHEMA.PROFILING')) {
+      return { rows: [{ duration: '1.2500' }], rowCount: 1, command: 'SELECT', fields: [] };
+    }
+    return originalQuery(sql, values);
+  };
+}
+
 describe('rawExecute', () => {
   test('executes once per parameter set in a batch', async () => {
     conn.queue.push({ insertId: 1, affectedRows: 1 }, { insertId: 2, affectedRows: 1 });
@@ -77,4 +91,40 @@ describe('rawExecute', () => {
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();
   });
+
+  test('flattens multiple result rows returned by a single execute', async () => {
+    conn.queue.push([{ id: 1 }, { id: 2 }]);
+    const result = await rawExecute('res', 'SELECT id FROM t WHERE a = ?', [[1]]);
+    expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  test('passes multi-batch callback results as an array', async () => {
+    let received: unknown;
+    await rawExecute('res', 'SELECT a FROM t WHERE id = ?', [[1], [2]], (value) => (received = value));
+    expect(Array.isArray(received)).toBe(true);
+    expect((received as unknown[]).length).toBe(2);
+  });
+
+  test('logs non-SCRIPT ERROR callback strings', async () => {
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    await rawExecute('res', 'INSERT INTO t VALUES (?)', [[1]], () => {
+      throw 'callback failed';
+    });
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('SCRIPT ERROR in invoking resource res'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  test('profiles a completed batch and logs its measured duration', async () => {
+    setConvar('mysql_debug', 'true');
+    config.setDebug();
+    resetProfilerState();
+    enableProfilerOnConnection(conn);
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+
+    await rawExecute('res', 'UPDATE t SET a = ?', [[1], [2]]);
+
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('1.2500'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
 });
