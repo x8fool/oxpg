@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { countPlaceholders, normalizeResult, readInsertId, translateSql } from 'database/driver';
+import { countPlaceholders, createPool, normalizeResult, readInsertId, translateSql } from 'database/driver';
 
 describe('PostgreSQL SQL adapter', () => {
   test('counts placeholders while ignoring question marks in literals and comments', () => {
@@ -32,6 +32,33 @@ describe('PostgreSQL SQL adapter', () => {
     const backtick = String.fromCharCode(96);
     const result = translateSql('SELECT * FROM ' + backtick + 'users' + backtick + ' WHERE id = ?', [5]);
     expect(result.sql).toBe('SELECT * FROM "users" WHERE id = $1');
+  });
+
+  test('preserves line and block comments while translating only real placeholders', () => {
+    const result = translateSql('SELECT ? /* ? in block */ -- ? in line\n, ?', [1, 2]);
+    expect(result.sql).toBe('SELECT $1 /* ? in block */ -- ? in line\n, $2');
+  });
+
+  test('handles escaped and doubled backticks in MySQL identifiers', () => {
+    const backtick = String.fromCharCode(96);
+    const result = translateSql('SELECT ' + backtick + 'tab' + backtick + backtick + 'name' + backtick + ', ' +
+      backtick + 'escaped\\"quote' + backtick);
+    expect(result.sql).toBe('SELECT "tab""name", "escaped""quote"');
+  });
+
+  test('translates MySQL backslash escapes inside double-quoted strings', () => {
+    const result = translateSql(String.raw`SELECT "a\\0b\\bc\\nd\\re\\tf\\Zg\\?h"`);
+    expect(result.sql).toBe(String.raw`SELECT 'a\\0b\\bc\\nd\\re\\tf\\Zg?h'`);
+  });
+
+  test('handles doubled double quotes in a MySQL string literal', () => {
+    const result = translateSql('SELECT "a""b"');
+    expect(result.sql).toBe('SELECT \'a"b\'');
+  });
+
+  test('preserves backslash escapes and doubled apostrophes in single-quoted strings', () => {
+    const result = translateSql(String.raw`SELECT 'a\\?b''c', ?`, [9]);
+    expect(result.sql).toBe(String.raw`SELECT 'a?b''c', $1`);
   });
 
   test('converts MySQL double-quoted string literals to PostgreSQL string literals', () => {
@@ -96,6 +123,11 @@ describe('PostgreSQL SQL adapter', () => {
   test('returns null if an INSERT response has no id-like field', () => {
     expect(readInsertId([{ name: 'player' }])).toBeNull();
     expect(readInsertId([])).toBeNull();
+  });
+
+  test('closes the native PostgreSQL pool', async () => {
+    const pool = createPool({} as any);
+    await expect(pool.end()).resolves.toBeUndefined();
   });
 
   test('normalizes PostgreSQL SELECT and write results to the oxmysql result shape', () => {
