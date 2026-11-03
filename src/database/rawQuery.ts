@@ -6,7 +6,7 @@ import type { CFXCallback, CFXParameters, QueryType } from '../types';
 import { getConnection } from './connection';
 import { performance } from 'perf_hooks';
 import validateResultSet from 'utils/validateResultSet';
-import { markProfilerUnsupported, runProfiler } from 'profiler';
+import { profilerState, runProfiler } from 'profiler';
 
 export const rawQuery = async (
   type: QueryType,
@@ -34,7 +34,7 @@ export const rawQuery = async (
     const result = await connection.query(query, parameters);
 
     if (hasProfiler) {
-      markProfilerUnsupported();
+      profilerState.supported = false;
     } else if (startTime) {
       logQuery(invokingResource, query, performance.now() - startTime, parameters);
     }
