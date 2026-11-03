@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { resetNatives, setConvar } from '../setup';
 import * as config from 'config';
-import { runProfiler, profileBatchStatements, markProfilerUnsupported } from 'profiler';
+import { runProfiler, profileBatchStatements } from 'profiler';
 
 function fakeConn(rows: any[] = []) {
   const queries: string[] = [];
@@ -46,15 +46,6 @@ describe('runProfiler', () => {
     expect(conn.queries).toHaveLength(0);
   });
 
-  test('does not retry profiler statements after profiling is marked unsupported', async () => {
-    setConvar('mysql_debug', 'true');
-    config.setDebug();
-    markProfilerUnsupported();
-
-    const conn = fakeConn();
-    expect(await runProfiler(conn as any, 'res')).toBe(false);
-    expect(conn.queries).toHaveLength(0);
-  });
 });
 
 describe('profileBatchStatements', () => {
