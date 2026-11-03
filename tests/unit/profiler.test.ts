@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { resetNatives, setConvar } from '../setup';
 import * as config from 'config';
-import { createProfiler, runProfiler, profileBatchStatements, markProfilerUnsupported } from 'profiler';
+import { createProfiler, runProfiler, profileBatchStatements, markProfilerUnsupported, resetProfilerState } from 'profiler';
 
 function fakeConn(rows: any[] = []) {
   const queries: string[] = [];
@@ -14,7 +14,7 @@ function fakeConn(rows: any[] = []) {
   };
 }
 
-beforeEach(() => resetNatives());
+beforeEach(() => { resetNatives(); resetProfilerState(); });
 
 describe('runProfiler', () => {
   test('is a no-op when debug is disabled', async () => {
