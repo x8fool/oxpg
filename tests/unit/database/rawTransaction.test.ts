@@ -20,6 +20,20 @@ beforeEach(() => {
   setConnectionFactory(() => conn);
 });
 
+
+function enableProfilerOnConnection(connection: FakeConnection) {
+  const originalQuery = connection.query.bind(connection);
+  connection.query = async (sql: string, values: any[] = []) => {
+    if (/^SET profiling/i.test(sql.trim())) {
+      return { rows: [], rowCount: 0, command: 'SET', fields: [] };
+    }
+    if (sql.includes('INFORMATION_SCHEMA.PROFILING')) {
+      return { rows: [{ duration: '1.2500' }], rowCount: 1, command: 'SELECT', fields: [] };
+    }
+    return originalQuery(sql, values);
+  };
+}
+
 describe('rawTransaction', () => {
   test('begins, runs every query, commits, then releases — in order', async () => {
     let res: unknown;
@@ -63,4 +77,34 @@ describe('rawTransaction', () => {
     expect(typeof event.payload.query).toBe('string');
     expect(event.payload.query).toContain('INSERT INTO t (a) VALUES (?)');
   });
+
+  test('reports an invalid transaction query list through promise callback mode', async () => {
+    const received: any[] = [];
+    await rawTransaction('res', null as any, [], (...args) => received.push(args), true);
+    expect(received[0][0]).toBeNull();
+    expect(String(received[0][1])).toContain('Transaction queries must be array');
+  });
+
+  test('logs a non-SCRIPT ERROR string thrown by the completion callback', async () => {
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    await rawTransaction('res', ['UPDATE t SET a = 1'], [], () => {
+      throw 'callback failed';
+    });
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('SCRIPT ERROR in invoking resource res'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  test('profiles transaction batches when the database supports profiling', async () => {
+    setConvar('mysql_debug', 'true');
+    config.setDebug();
+    resetProfilerState();
+    enableProfilerOnConnection(conn);
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+
+    await rawTransaction('res', ['UPDATE t SET a = 1'], []);
+
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('1.2500'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
 });
