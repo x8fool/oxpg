@@ -22,6 +22,23 @@ describe('createConnectionPool', () => {
     handler!(conn as any);
     expect(conn.calls.some((call) => call.arg?.sql === 'SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL READ COMMITTED')).toBe(true);
   });
+
+  test('warns when PostgreSQL rejects the connection isolation setup statement', async () => {
+    const handler = getConnectionHandler();
+    expect(handler).toBeInstanceOf(Function);
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+
+    handler!({
+      query: async () => {
+        throw new Error('isolation level is not supported');
+      },
+    });
+
+    await Promise.resolve();
+
+    expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('Unable to configure PostgreSQL transaction isolation'))).toBe(true);
+    warnSpy.mockRestore();
+  });
   test('logs a diagnostic instead of throwing when the pool cannot be created', async () => {
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
     setPoolCreationError(Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }));
