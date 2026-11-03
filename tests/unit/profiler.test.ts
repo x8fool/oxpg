@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { resetNatives, setConvar } from '../setup';
 import * as config from 'config';
-import { runProfiler, profileBatchStatements, markProfilerUnsupported } from 'profiler';
+import { createProfiler, runProfiler, profileBatchStatements, markProfilerUnsupported } from 'profiler';
 
 function fakeConn(rows: any[] = []) {
   const queries: string[] = [];
@@ -54,6 +54,28 @@ describe('runProfiler', () => {
     const conn = fakeConn();
     expect(await runProfiler(conn as any, 'res')).toBe(false);
     expect(conn.queries).toHaveLength(0);
+  });
+
+  test('warns once and caches unsupported state after the first failed attempt', async () => {
+    setConvar('mysql_debug', 'true');
+    config.setDebug();
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    const isolatedProfiler = createProfiler();
+    const conn = {
+      queries: [] as string[],
+      query: async (sql: string) => {
+        conn.queries.push(sql);
+        throw new Error('profiling metadata is unavailable');
+      },
+    };
+
+    expect(await isolatedProfiler.runProfiler(conn as any, 'res')).toBe(false);
+    expect(await isolatedProfiler.runProfiler(conn as any, 'res')).toBe(false);
+
+    expect(conn.queries).toEqual(['SET profiling_history_size = 0']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('profiling metadata is unavailable');
+    warn.mockRestore();
   });
 });
 
