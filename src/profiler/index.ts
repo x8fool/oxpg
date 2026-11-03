@@ -16,6 +16,10 @@ export function createProfiler() {
     profilerSupported = false;
   }
 
+  function resetProfilerState() {
+    profilerSupported = undefined;
+  }
+
   async function runProfiler(connection: MySql, invokingResource: string) {
     if (!mysql_debug) return;
     if (Array.isArray(mysql_debug) && !mysql_debug.includes(invokingResource)) return;
@@ -38,11 +42,12 @@ export function createProfiler() {
     }
   }
 
-  return { markProfilerUnsupported, runProfiler };
+  return { markProfilerUnsupported, resetProfilerState, runProfiler };
 }
 
 const defaultProfiler = createProfiler();
 export const markProfilerUnsupported = defaultProfiler.markProfilerUnsupported;
+export const resetProfilerState = defaultProfiler.resetProfilerState;
 export const runProfiler = defaultProfiler.runProfiler;
 
 export async function profileBatchStatements(
