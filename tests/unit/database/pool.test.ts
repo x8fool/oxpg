@@ -34,7 +34,7 @@ describe('createConnectionPool', () => {
       },
     });
 
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(warnSpy.mock.calls.some((call) => String(call[0]).includes('Unable to configure PostgreSQL transaction isolation'))).toBe(true);
     warnSpy.mockRestore();
