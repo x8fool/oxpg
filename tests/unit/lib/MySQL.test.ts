@@ -94,6 +94,14 @@ describe('dispatch & promise behaviour', () => {
     await expect(oxmysql.scalar('q', [1])).resolves.toBe(123);
   });
 
+  test('passes update results through the optional callback', async () => {
+    let received: unknown;
+    nextResult = 456;
+    await oxmysql.update('UPDATE t SET a = ?', [1], (result) => (received = result));
+    expect(lastCall?.name).toBe('update');
+    expect(received).toBe(456);
+  });
+
   test('rejects when the server returns an error', async () => {
     nextError = 'boom';
     await expect(oxmysql.update('q', [1])).rejects.toBe('boom');
