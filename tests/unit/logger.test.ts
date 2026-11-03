@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { resetNatives, setConvar, getCommand, getNetHandler, getEmitNetCalls } from '../setup';
 import * as config from 'config';
-import { logError, logQuery } from 'logger';
+import { createLogger, logError, logQuery } from 'logger';
 
 const enableUi = () => {
   setConvar('mysql_ui', 'true');
@@ -10,6 +10,31 @@ const enableUi = () => {
 };
 
 beforeEach(() => resetNatives());
+
+describe('logger service loader', () => {
+  test('loads an explicitly named resource and nested service path', () => {
+    let loaded: unknown;
+    const service = createLogger('@shared-resource/logs/audit', () => 'current-resource', (resource, path) => {
+      loaded = { resource, path };
+      return 'return (payload) => payload;';
+    });
+
+    expect(loaded).toEqual({ resource: 'shared-resource', path: 'logs/audit.js' });
+    expect(service({ event: 'ready' })).toEqual({ event: 'ready' });
+  });
+
+  test('prefixes relative logger services and falls back to a no-op for empty source', () => {
+    let loaded: unknown;
+    const service = createLogger('audit', () => 'current-resource', (resource, path) => {
+      loaded = { resource, path };
+      return '';
+    });
+
+    expect(loaded).toEqual({ resource: 'current-resource', path: 'logger/audit.js' });
+    expect(() => service()).not.toThrow();
+    expect(() => createLogger('', () => 'unused', () => 'unused')()).not.toThrow();
+  });
+});
 
 describe('logError', () => {
   test('prints a formatted error and emits oxmysql:error (console path)', () => {
@@ -25,6 +50,10 @@ describe('logError', () => {
     expect(output).toContain('bad');
     expect(events.find((e) => e.name === 'oxmysql:error')).toBeDefined();
     errSpy.mockRestore();
+  });
+
+  test('swallows exceptions thrown by an error callback in promise mode', () => {
+    expect(() => logError('res', () => { throw new Error('callback failed'); }, true, 'plain failure')).not.toThrow();
   });
 
   test('returns the error to the callback in promise mode', () => {
@@ -117,4 +146,31 @@ describe('oxmysql:fetchResource net handler', () => {
     expect(emit).toBeDefined();
     expect(emit![2].queries.every((q: any) => q.query.toLowerCase().includes('needle'))).toBe(true);
   });
+
+  test('sorts by query text and safely handles an unknown sort key', () => {
+    enableUi();
+    (globalThis as any).IsPlayerAceAllowed = () => true;
+    (globalThis as any).source = 1;
+    logQuery('sortRes', 'SELECT z', 10);
+    logQuery('sortRes', 'SELECT a', 20);
+
+    getNetHandler('oxmysql:fetchResource')!({
+      resource: 'sortRes',
+      pageIndex: 0,
+      search: '',
+      sortBy: [{ id: 'query', desc: false }],
+    });
+    let emit = getEmitNetCalls().filter((a) => a[0] === 'oxmysql:loadResource').at(-1);
+    expect(emit![2].queries[0].query).toBe('SELECT a');
+
+    getNetHandler('oxmysql:fetchResource')!({
+      resource: 'sortRes',
+      pageIndex: 0,
+      search: '',
+      sortBy: [{ id: 'unknown', desc: false }],
+    } as any);
+    emit = getEmitNetCalls().filter((a) => a[0] === 'oxmysql:loadResource').at(-1);
+    expect(emit).toBeDefined();
+  });
+
 });
