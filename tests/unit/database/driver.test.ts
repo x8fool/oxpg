@@ -41,7 +41,7 @@ describe('PostgreSQL SQL adapter', () => {
   });
 
   test('escapes apostrophes and ignores placeholders inside double-quoted strings', () => {
-    const result = translateSql('SELECT "it\\'s ? fine" AS label, ? AS value', [7]);
+    const result = translateSql(`SELECT "it's ? fine" AS label, ? AS value`, [7]);
     expect(result.sql).toBe("SELECT 'it''s ? fine' AS label, $1 AS value");
     expect(result.values).toEqual([7]);
   });
