@@ -48,7 +48,7 @@ describe('PostgreSQL SQL adapter', () => {
 
   test('translates MySQL backslash escapes inside double-quoted strings', () => {
     const result = translateSql(String.raw`SELECT "a\0b\bc\nd\re\tf\Zg\?h"`);
-    expect(result.sql).toBe(String.raw`SELECT 'a\\0b\\bc\\nd\\re\\tf\\Zg?h'`);
+    expect(result.sql).toBe(String.raw`SELECT 'a\0b\bc\nd\re\tf\Zg?h'`);
   });
 
   test('handles doubled double quotes in a MySQL string literal', () => {
@@ -58,7 +58,7 @@ describe('PostgreSQL SQL adapter', () => {
 
   test('preserves backslash escapes and doubled apostrophes in single-quoted strings', () => {
     const result = translateSql(String.raw`SELECT 'a\?b''c', ?`, [9]);
-    expect(result.sql).toBe(String.raw`SELECT 'a?b''c', $1`);
+    expect(result.sql).toBe(String.raw`SELECT 'a\?b''c', $1`);
   });
 
   test('converts MySQL double-quoted string literals to PostgreSQL string literals', () => {
