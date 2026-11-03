@@ -83,6 +83,21 @@ describe('profileBatchStatements', () => {
     log.mockRestore();
   });
 
+  test('falls back silently when PostgreSQL cannot provide MySQL profiling metadata', async () => {
+    setConvar('mysql_debug', 'true');
+    config.setDebug();
+
+    const conn = {
+      query: async () => {
+        throw new Error('INFORMATION_SCHEMA.PROFILING is unavailable');
+      },
+    };
+
+    await expect(
+      profileBatchStatements(conn as any, 'res', 'INSERT INTO t VALUES (?)', [[1]], 0),
+    ).resolves.toBeUndefined();
+  });
+
   test('returns early when profiling produced no rows', async () => {
     setConvar('mysql_debug', 'true');
     config.setDebug();
