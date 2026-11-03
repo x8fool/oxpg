@@ -34,6 +34,18 @@ describe('PostgreSQL SQL adapter', () => {
     expect(result.sql).toBe('SELECT * FROM "users" WHERE id = $1');
   });
 
+  test('converts MySQL double-quoted string literals to PostgreSQL string literals', () => {
+    const result = translateSql('SELECT * FROM jobs ORDER BY name <>  "unemployed", name');
+    expect(result.sql).toBe("SELECT * FROM jobs ORDER BY name <>  'unemployed', name");
+    expect(result.values).toEqual([]);
+  });
+
+  test('escapes apostrophes and ignores placeholders inside double-quoted strings', () => {
+    const result = translateSql('SELECT "it\\'s ? fine" AS label, ? AS value', [7]);
+    expect(result.sql).toBe("SELECT 'it''s ? fine' AS label, $1 AS value");
+    expect(result.values).toEqual([7]);
+  });
+
   test('maps INSERT IGNORE and returns the generated row', () => {
     const backtick = String.fromCharCode(96);
     const result = translateSql('INSERT IGNORE INTO ' + backtick + 'users' + backtick + ' (name) VALUES (?)', ['sam']);
