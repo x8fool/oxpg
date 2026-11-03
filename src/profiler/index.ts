@@ -9,30 +9,26 @@ const profilerStatements = [
   'SET profiling = 1',
 ];
 
-let profilerSupported: boolean | undefined;
-
-export function markProfilerUnsupported() {
-  profilerSupported = false;
-}
+export const profilerState: { supported: boolean | undefined } = { supported: undefined };
 
 export async function runProfiler(connection: MySql, invokingResource: string) {
   if (!mysql_debug) return;
   if (Array.isArray(mysql_debug) && !mysql_debug.includes(invokingResource)) return;
-  if (profilerSupported === false) return false;
+  if (profilerState.supported === false) return false;
 
   try {
     for (const statement of profilerStatements) await connection.query(statement);
-    profilerSupported = true;
+    profilerState.supported = true;
     return true;
   } catch (err) {
-    if (profilerSupported === undefined) {
+    if (profilerState.supported === undefined) {
       console.warn(
         '^3Query profiling is unavailable on this database server (' +
           (err instanceof Error ? err.message : err) +
           '). Falling back to basic query timing.^0',
       );
     }
-    profilerSupported = false;
+    profilerState.supported = false;
     return false;
   }
 }
@@ -51,7 +47,7 @@ export async function profileBatchStatements(
     )) as Record<string, any>[];
     for (const statement of profilerStatements) await connection.query(statement);
   } catch {
-    profilerSupported = false;
+    profilerState.supported = false;
     return;
   }
 
