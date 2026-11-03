@@ -90,6 +90,10 @@ describe('getConnection', () => {
     expect(conn!.id).toBe(123);
   });
 
+  test('returns undefined for an unknown connection id', async () => {
+    await expect(getConnection(999999)).resolves.toBeUndefined();
+  });
+
   test('returns a non-owning handle for an existing connection id', async () => {
     const fake = createFakeConnection(777);
     setConnectionFactory(() => fake);
