@@ -2,24 +2,33 @@ import { mysql_debug, mysql_log_size, mysql_slow_query_warning, mysql_ui } from 
 import type { CFXCallback, CFXParameters } from '../types';
 import { dbVersion } from '../database';
 
-let loggerResource = '';
-let loggerService = GetConvar('mysql_logger_service', '');
+export function createLogger(
+  configuredService: string,
+  getCurrentResourceName: () => string,
+  loadResourceFile: (resource: string, path: string) => string,
+) {
+  let loggerResource = '';
+  let loggerService = configuredService;
 
-if (loggerService) {
-  if (loggerService.startsWith('@')) {
-    const [resource, ...path] = loggerService.slice(1).split('/');
+  if (loggerService) {
+    if (loggerService.startsWith('@')) {
+      const [resource, ...path] = loggerService.slice(1).split('/');
 
-    if (resource && path) {
-      loggerResource = resource;
-      loggerService = path.join('/');
-    }
-  } else loggerService = `logger/${loggerService}`;
+      if (resource && path) {
+        loggerResource = resource;
+        loggerService = path.join('/');
+      }
+    } else loggerService = `logger/${loggerService}`;
+  }
+
+  return (
+    (loggerService &&
+      new Function(loadResourceFile(loggerResource || getCurrentResourceName(), `${loggerService}.js`))()) ||
+    (() => {})
+  );
 }
 
-export const logger =
-  (loggerService &&
-    new Function(LoadResourceFile(loggerResource || GetCurrentResourceName(), `${loggerService}.js`))()) ||
-  (() => {});
+export const logger = createLogger(GetConvar('mysql_logger_service', ''), GetCurrentResourceName, LoadResourceFile);
 
 export function logError(
   invokingResource: string,

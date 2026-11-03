@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { resetNatives, setConvar } from '../../setup';
 import { resetDb, setConnectionFactory, createFakeConnection, type FakeConnection } from '../../helpers/db';
 import * as config from 'config';
+import { resetProfilerState } from 'profiler';
 
 const { createConnectionPool } = await import('database/pool');
 await createConnectionPool();
@@ -11,12 +12,27 @@ let conn: FakeConnection;
 
 beforeEach(() => {
   resetNatives();
+  resetProfilerState();
   setConvar('mysql_debug', 'false');
   config.setDebug();
   resetDb();
   conn = createFakeConnection();
   setConnectionFactory(() => conn);
 });
+
+
+function enableProfilerOnConnection(connection: FakeConnection) {
+  const originalQuery = connection.query.bind(connection);
+  connection.query = async (sql: string, values: any[] = []) => {
+    if (/^SET profiling/i.test(sql.trim())) {
+      return { rows: [], rowCount: 0, command: 'SET', fields: [] };
+    }
+    if (sql.includes('INFORMATION_SCHEMA.PROFILING')) {
+      return { rows: [{ duration: '1.2500' }], rowCount: 1, command: 'SELECT', fields: [] };
+    }
+    return originalQuery(sql, values);
+  };
+}
 
 describe('rawQuery', () => {
   test('runs a parameterised insert and returns the generated id', async () => {
@@ -72,4 +88,25 @@ describe('rawQuery', () => {
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();
   });
+
+  test('logs non-SCRIPT ERROR callback strings', async () => {
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    await rawQuery('insert', 'res', 'INSERT INTO t VALUES (?)', [1], () => {
+      throw 'callback failed';
+    });
+    expect(logSpy.mock.calls.some((call) => String(call[0]).includes('SCRIPT ERROR in invoking resource res'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  test('uses PostgreSQL-backed profiling when its statements are supported', async () => {
+    setConvar('mysql_debug', 'true');
+    config.setDebug();
+    resetProfilerState();
+    enableProfilerOnConnection(conn);
+
+    const result = await rawQuery('select', 'res', 'SELECT a FROM t WHERE id = ?', [1]);
+    expect(result).toEqual([]);
+    expect(conn.calls.some((call) => String(call.arg?.sql).includes('INFORMATION_SCHEMA.PROFILING'))).toBe(false);
+  });
+
 });

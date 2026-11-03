@@ -9,33 +9,46 @@ const profilerStatements = [
   'SET profiling = 1',
 ];
 
-let profilerSupported: boolean | undefined;
+export function createProfiler() {
+  let profilerSupported: boolean | undefined;
 
-export function markProfilerUnsupported() {
-  profilerSupported = false;
-}
-
-export async function runProfiler(connection: MySql, invokingResource: string) {
-  if (!mysql_debug) return;
-  if (Array.isArray(mysql_debug) && !mysql_debug.includes(invokingResource)) return;
-  if (profilerSupported === false) return false;
-
-  try {
-    for (const statement of profilerStatements) await connection.query(statement);
-    profilerSupported = true;
-    return true;
-  } catch (err) {
-    if (profilerSupported === undefined) {
-      console.warn(
-        '^3Query profiling is unavailable on this database server (' +
-          (err instanceof Error ? err.message : err) +
-          '). Falling back to basic query timing.^0',
-      );
-    }
+  function markProfilerUnsupported() {
     profilerSupported = false;
-    return false;
   }
+
+  function resetProfilerState() {
+    profilerSupported = undefined;
+  }
+
+  async function runProfiler(connection: MySql, invokingResource: string) {
+    if (!mysql_debug) return;
+    if (Array.isArray(mysql_debug) && !mysql_debug.includes(invokingResource)) return;
+    if (profilerSupported === false) return false;
+
+    try {
+      for (const statement of profilerStatements) await connection.query(statement);
+      profilerSupported = true;
+      return true;
+    } catch (err) {
+      if (profilerSupported === undefined) {
+        console.warn(
+          '^3Query profiling is unavailable on this database server (' +
+            (err instanceof Error ? err.message : err) +
+            '). Falling back to basic query timing.^0',
+        );
+      }
+      profilerSupported = false;
+      return false;
+    }
+  }
+
+  return { markProfilerUnsupported, resetProfilerState, runProfiler };
 }
+
+const defaultProfiler = createProfiler();
+export const markProfilerUnsupported = defaultProfiler.markProfilerUnsupported;
+export const resetProfilerState = defaultProfiler.resetProfilerState;
+export const runProfiler = defaultProfiler.runProfiler;
 
 export async function profileBatchStatements(
   connection: MySql,
@@ -51,7 +64,7 @@ export async function profileBatchStatements(
     )) as Record<string, any>[];
     for (const statement of profilerStatements) await connection.query(statement);
   } catch {
-    profilerSupported = false;
+    markProfilerUnsupported();
     return;
   }
 

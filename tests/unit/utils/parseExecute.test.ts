@@ -32,6 +32,10 @@ describe('parseExecute', () => {
     expect(parseExecute(1, 'nope' as any)).toEqual([]);
   });
 
+  test('mixed object and positional rows preserve arrays while padding object rows', () => {
+    expect(parseExecute(2, [[1, 2], { 1: 'b' }] as any)).toEqual([[1, 2], ['b', null]]);
+  });
+
   test('array-of-arrays is passed through unchanged', () => {
     expect(parseExecute(2, [[1, 2], [3, 4]])).toEqual([[1, 2], [3, 4]]);
   });
@@ -57,6 +61,10 @@ describe('parseValues', () => {
   test('a short array is padded with null starting at its own length', () => {
     // the correct padding pattern, unlike parseArguments
     expect(parseValues(3, [1])).toEqual([1, null, null]);
+  });
+
+  test('rejects non-array, non-object values', () => {
+    expect(() => parseValues(1, 'invalid' as any)).toThrow('Parameters expected an array');
   });
 
   test('an array at/over the placeholder count is left intact', () => {

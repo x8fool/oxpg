@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import '../../setup';
 
 // Fake server-side export surface: records the last dispatched call and
@@ -94,6 +94,14 @@ describe('dispatch & promise behaviour', () => {
     await expect(oxmysql.scalar('q', [1])).resolves.toBe(123);
   });
 
+  test('passes update results through the optional callback', async () => {
+    let received: unknown;
+    nextResult = 456;
+    await oxmysql.update('UPDATE t SET a = ?', [1], (result) => (received = result));
+    expect(lastCall?.name).toBe('update');
+    expect(received).toBe(456);
+  });
+
   test('rejects when the server returns an error', async () => {
     nextError = 'boom';
     await expect(oxmysql.update('q', [1])).rejects.toBe('boom');
@@ -119,5 +127,21 @@ describe('dispatch & promise behaviour', () => {
 describe('ready', () => {
   test('invokes the callback once the resource is started', async () => {
     await new Promise<void>((resolve) => oxmysql.ready(() => resolve()));
+  });
+
+  test('waits and polls until the resource reaches the started state', async () => {
+    let polls = 0;
+    (globalThis as any).GetResourceState = () => (++polls === 1 ? 'starting' : 'started');
+    const timerSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler) => {
+      queueMicrotask(() => {
+        if (typeof handler === 'function') handler();
+      });
+      return 1 as any;
+    }) as any);
+
+    await new Promise<void>((resolve) => oxmysql.ready(() => resolve()));
+
+    expect(polls).toBe(2);
+    timerSpy.mockRestore();
   });
 });

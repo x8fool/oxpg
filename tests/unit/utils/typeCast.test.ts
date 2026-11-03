@@ -83,6 +83,13 @@ describe('typeCast (text protocol)', () => {
     expect(result).toEqual([null]);
   });
 
+  test('all legacy binary blob aliases return byte arrays', () => {
+    for (const type of ['TINY_BLOB', 'MEDIUM_BLOB', 'LONG_BLOB']) {
+      expect(typeCast(field({ type, charset: BINARY_CHARSET, buffer: () => Buffer.from([4, 5]) }), mock(() => 0)))
+        .toEqual([4, 5]);
+    }
+  });
+
   test('a non-binary BLOB (text charset) returns its string', () => {
     const result = typeCast(field({ type: 'BLOB', charset: 33, string: () => 'hello' }), mock(() => 0));
     expect(result).toBe('hello');
@@ -99,6 +106,11 @@ describe('typeCastExecute (binary protocol)', () => {
   test('handles dates like the text caster', () => {
     const result = typeCastExecute(field({ type: 'DATETIME', string: () => '2024-01-02 03:04:05' }), mock(() => 0));
     expect(result).toBe(new Date('2024-01-02 03:04:05').getTime());
+  });
+
+  test('DATE is anchored to midnight in the binary protocol too', () => {
+    const result = typeCastExecute(field({ type: 'DATE', string: () => '2024-01-02' }), mock(() => 0));
+    expect(result).toBe(new Date('2024-01-02 00:00:00').getTime());
   });
 
   test('defers everything else to next() (does not touch BLOBs)', () => {

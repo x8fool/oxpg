@@ -78,4 +78,35 @@ describe('startTransaction', () => {
     expect(clearSpy).toHaveBeenCalled();
     clearSpy.mockRestore();
   });
+
+  test('wraps a query error raised after BEGIN succeeds', async () => {
+    spyOn(console, 'error').mockImplementation(() => {});
+    const result = await startTransaction('res', async (query: any) => {
+      conn.failOn.query = new Error('late query failure');
+      await query('INSERT INTO t (a) VALUES (?)', [1]);
+      return true;
+    });
+
+    expect(result).toBe(false);
+    expect(conn.ops()).toContain('begin');
+    expect(conn.ops()).toContain('rollback');
+    expect(conn.ops()).not.toContain('commit');
+  });
+
+
+  test('rejects a transaction when its timeout callback fires before completion', async () => {
+    spyOn(console, 'error').mockImplementation(() => {});
+    const timeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler) => {
+      if (typeof handler === 'function') handler();
+      return 1 as any;
+    }) as any);
+
+    const result = await startTransaction('res', async () => true);
+
+    expect(result).toBe(false);
+    expect(conn.ops()).toContain('rollback');
+    expect(conn.ops()).not.toContain('commit');
+    timeoutSpy.mockRestore();
+  });
+
 });

@@ -112,6 +112,15 @@ describe('oxmysql_debug command', () => {
     handler(0, ['remove', 'my-resource']);
     expect(Array.isArray(config.mysql_debug) ? config.mysql_debug.includes('my-resource') : false).toBe(false);
   });
+  test('falls through to usage when remove has no debug resource list', () => {
+    setConvar('mysql_debug', 'false');
+    config.setDebug();
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    getCommand('oxmysql_debug')!(0, ['remove', 'missing']);
+    expect(String(logSpy.mock.calls[0][0])).toContain('Usage: oxmysql add|remove <resource>');
+    logSpy.mockRestore();
+  });
+
   test('refuses to run client-side (source !== 0)', () => {
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
     getCommand('oxmysql_debug')!(5, ['add', 'x']);
