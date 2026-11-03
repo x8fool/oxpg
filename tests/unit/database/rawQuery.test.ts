@@ -54,9 +54,14 @@ describe('rawQuery', () => {
     setConvar('mysql_debug', 'true');
     config.setDebug();
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+
     await rawQuery('insert', 'res', 'INSERT INTO t (a) VALUES (?)', [1]);
-    expect(conn.calls.some((c) => String(c.arg?.sql).includes('INFORMATION_SCHEMA.PROFILING'))).toBe(false);
-    expect(conn.calls.some((c) => String(c.arg?.sql).startsWith('SET profiling'))).toBe(true);
+
+    const output = logSpy.mock.calls.map((call) => String(call[0])).join('\\n');
+    expect(output).toContain('took');
+    expect(output).toContain('INSERT INTO t (a) VALUES (?)');
+    expect(conn.calls.some((call) => String(call.arg?.sql).includes('INFORMATION_SCHEMA.PROFILING'))).toBe(false);
+
     logSpy.mockRestore();
   });
   test('a callback throwing a SCRIPT ERROR string is swallowed', async () => {
