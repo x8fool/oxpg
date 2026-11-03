@@ -63,6 +63,18 @@ describe('disposal (Symbol.asyncDispose)', () => {
     expect(fake.ops()).not.toContain('commit');
   });
 
+  test('swallows rollback errors during disposal and still releases the connection', async () => {
+    const fake = createFakeConnection();
+    fake.failOn.rollback = new Error('rollback failed');
+    setConnectionFactory(() => fake);
+    const c = await getConnection();
+    await c!.beginTransaction();
+
+    await asyncDispose(c);
+
+    expect(fake.ops()).toEqual(['begin', 'rollback', 'release']);
+  });
+
   test('an explicitly committed transaction is just released', async () => {
     const fake = createFakeConnection();
     setConnectionFactory(() => fake);
