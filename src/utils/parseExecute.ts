@@ -25,7 +25,7 @@ export const parseExecute = (placeholders: number, parameters: CFXParameters) =>
       const arr: unknown[] = [];
       Object.entries(parameters).forEach((entry) => (arr[parseInt(entry[0]) - 1] = entry[1]));
       parameters = arr;
-    } else throw new Error(`Parameters expected an array but received ${typeof parameters} instead`);
+    }
   }
 
   if (!parameters.every(Array.isArray)) {
